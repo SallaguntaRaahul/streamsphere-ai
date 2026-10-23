@@ -1,0 +1,18 @@
+name: service
+image: { repository: ghcr.io/OWNER/streamsphere-service, tag: "0.1.0", digest: "", pullPolicy: IfNotPresent }
+replicas: 1
+port: 8080
+env: {}                 # plain configuration (ConfigMap)
+secretEnvFrom: []       # names of pre-created Secrets (never put secret values in values files)
+resources:
+  requests: { cpu: 50m, memory: 256Mi }
+  limits: { cpu: 500m, memory: 384Mi }
+javaOpts: "-XX:+UseSerialGC -XX:MaxRAMPercentage=65 -XX:TieredStopAtLevel=1 -Xss512k -XX:+ExitOnOutOfMemoryError"
+probes: { path: /actuator/health, initialDelaySeconds: 20 }
+ingress: { enabled: false, host: "", paths: [] }
+networkPolicy:
+  enabled: true
+  allowFromIngress: false       # only the gateway gets ingress-controller traffic
+  allowFrom: [gateway]          # app.kubernetes.io/name values allowed to call this service
+jobLauncher: { enabled: false } # media only: RBAC to create FFmpeg Jobs
+hpa: { enabled: false, min: 1, max: 3, cpu: 70 } # off on the single free node (no spare capacity)

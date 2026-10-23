@@ -1,0 +1,34 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "PlaybackStarted.v1.schema.json",
+ "title": "PlaybackStarted.v1 payload",
+ "description": "Routing key PlaybackStarted.v1 on exchange streamsphere.events. Producer: playback. Consumers: analytics, search, recommendations",
+ "type": "object",
+ "required": [
+  "sessionId",
+  "titleId"
+ ],
+ "properties": {
+  "sessionId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "titleId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "assetId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "creatorId": {
+   "type": "string"
+  },
+  "userId": {
+   "type": "string"
+  },
+  "preview": {
+   "type": "boolean"
+  }
+ }
+}

@@ -1,0 +1,138 @@
+# CI for StreamSphere AI. Runs on standard GitHub-hosted runners (free for PUBLIC repos; private repos
+# consume the 2,000-minute quota — see docs/cost/COST_MODEL.md). Image pushes require an explicit
+# workflow_dispatch input; nothing is ever deployed or provisioned from CI.
+name: ci
+on:
+  push: { branches: [main] }
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      push_images: { description: "Push multi-arch images to GHCR (owner approval)", type: boolean, default: false }
+permissions: { contents: read }
+concurrency: { group: "ci-${{ github.ref }}", cancel-in-progress: true }
+
+jobs:
+  jvm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: "21", cache: maven }
+      - name: Build + unit + Testcontainers integration tests
+        run: mvn -B -Dmaven.repo.local=$HOME/.m2/repository verify
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with: { name: surefire-reports, path: "**/target/surefire-reports/*.txt", retention-days: 5 }
+
+  python:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults: { run: { working-directory: services/recommendations } }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.12" }
+      - run: pip install . pytest==8.4.2 && EMBEDDER=hashing python -m pytest -q tests
+
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults: { run: { working-directory: apps/web-angular } }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: "22.22", cache: npm, cache-dependency-path: apps/web-angular/package-lock.json }
+      - run: npm ci && npx ng build
+
+  contracts-and-iac:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: azure/setup-helm@v4
+      - name: Helm lint + template every service
+        run: |
+          helm lint infrastructure/helm/streamsphere-service
+          for v in infrastructure/helm/values/*.yaml; do helm template "$(basename "$v" .yaml)" infrastructure/helm/streamsphere-service -f "$v" > /dev/null; done
+      - name: Compose files are valid
+        run: cp .env.example .env && docker compose config -q && docker compose --profile full config -q
+      - uses: opentofu/setup-opentofu@v1
+      - name: OpenTofu fmt + validate (plan-only; never applied from CI)
+        working-directory: infrastructure/opentofu/oci-free
+        run: tofu fmt -check && tofu init -backend=false && tofu validate
+
+  security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions: { contents: read, security-events: write }
+    steps:
+      - uses: actions/checkout@v5
+      - name: Dependency + secret + IaC scan (Trivy filesystem)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with: { scan-type: fs, scanners: "vuln,secret,misconfig", severity: "HIGH,CRITICAL", ignore-unfixed: true, format: sarif, output: trivy.sarif }
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with: { sarif_file: trivy.sarif }
+      - name: SBOM (CycloneDX via Syft)
+        uses: anchore/sbom-action@v0.24.3
+        with: { format: cyclonedx-json, artifact-name: sbom.cdx.json }
+
+  docker-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build representative images from source (multi-stage "runtime" targets, no push)
+        run: |
+          docker build -f infrastructure/docker/java-service.Dockerfile --target runtime --build-arg MODULE=services/catalog -t ci/catalog .
+          docker build -f infrastructure/docker/ffmpeg-worker.Dockerfile --target runtime -t ci/ffmpeg-worker .
+          docker build -t ci/web apps/web-angular
+          docker run --rm --entrypoint ffmpeg ci/ffmpeg-worker -hide_banner -version | head -1
+
+  images:
+    if: github.event_name == 'workflow_dispatch' && inputs.push_images
+    needs: [jvm, python, web, contracts-and-iac, security]
+    runs-on: ubuntu-24.04
+    permissions: { contents: read, packages: write }
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { image: gateway, context: ., file: infrastructure/docker/java-service.Dockerfile, module: services/gateway }
+          - { image: profile, context: ., file: infrastructure/docker/java-service.Dockerfile, module: services/profile }
+          - { image: catalog, context: ., file: infrastructure/docker/java-service.Dockerfile, module: services/catalog }
+          - { image: creator, context: ., file: infrastructure/docker/java-service.Dockerfile, module: services/creator }
+          - { image: upload, context: ., file: infrastructure/docker/java-service.Dockerfile, module: services/upload }
+          - { image: media, context: ., file: infrastructure/docker/java-service.Dockerfile, module: services/media }
+          - { image: playback, context: ., file: infrastructure/docker/java-service.Dockerfile, module: services/playback }
+          - { image: history, context: ., file: infrastructure/docker/java-service.Dockerfile, module: services/history }
+          - { image: search, context: ., file: infrastructure/docker/java-service.Dockerfile, module: services/search }
+          - { image: moderation, context: ., file: infrastructure/docker/java-service.Dockerfile, module: services/moderation }
+          - { image: analytics, context: ., file: infrastructure/docker/java-service.Dockerfile, module: services/analytics }
+          - { image: notifications, context: ., file: infrastructure/docker/java-service.Dockerfile, module: services/notifications }
+          - { image: ffmpeg-worker, context: ., file: infrastructure/docker/ffmpeg-worker.Dockerfile, module: workers/ffmpeg }
+          - { image: recommendations, context: services/recommendations, file: services/recommendations/Dockerfile, module: "" }
+          - { image: web, context: apps/web-angular, file: apps/web-angular/Dockerfile, module: "" }
+    steps:
+      - uses: actions/checkout@v5
+      - name: Lowercase image owner (registry names must be lowercase)
+        run: echo "OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          target: runtime
+          build-args: MODULE=${{ matrix.module }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: true
+          sbom: true
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          tags: |
+            ghcr.io/${{ env.OWNER }}/streamsphere-${{ matrix.image }}:${{ github.sha }}
+            ghcr.io/${{ env.OWNER }}/streamsphere-${{ matrix.image }}:latest

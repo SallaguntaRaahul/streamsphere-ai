@@ -1,0 +1,9 @@
+name: recommendations
+image: { repository: ghcr.io/OWNER/streamsphere-recommendations, tag: "0.1.0" }
+env:
+  JWT_ISSUER: "https://auth.example.invalid/realms/streamsphere"
+  JWKS_URI: "http://keycloak:8080/realms/streamsphere/protocol/openid-connect/certs"
+secretEnvFrom: [recommendations-db, rabbitmq-credentials]
+resources: { requests: { cpu: 50m, memory: 256Mi }, limits: { cpu: 500m, memory: 512Mi } }
+networkPolicy: { enabled: true, allowFromIngress: false, allowFrom: [gateway, search] }
+probes: { path: /actuator/health, initialDelaySeconds: 10 }

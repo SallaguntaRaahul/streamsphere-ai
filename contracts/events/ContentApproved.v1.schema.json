@@ -1,0 +1,36 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "ContentApproved.v1.schema.json",
+ "title": "ContentApproved.v1 payload",
+ "description": "Routing key ContentApproved.v1 on exchange streamsphere.events. Producer: moderation. Consumers: catalog, notifications",
+ "type": "object",
+ "required": [
+  "titleId",
+  "creatorId"
+ ],
+ "properties": {
+  "titleId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "creatorId": {
+   "type": "string"
+  },
+  "title": {
+   "type": "string"
+  },
+  "reason": {
+   "type": [
+    "string",
+    "null"
+   ]
+  },
+  "appeal": {
+   "type": "boolean"
+  },
+  "caseId": {
+   "type": "string",
+   "format": "uuid"
+  }
+ }
+}

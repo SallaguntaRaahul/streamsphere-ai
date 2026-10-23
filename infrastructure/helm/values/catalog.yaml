@@ -1,0 +1,17 @@
+name: catalog
+image: { repository: ghcr.io/OWNER/streamsphere-catalog, tag: "0.1.0" }
+env:
+  SPRING_PROFILES_ACTIVE: "docker"
+  STREAMSPHERE_SECURITY_ISSUER: "https://auth.example.invalid/realms/streamsphere"
+  STREAMSPHERE_SECURITY_JWK_SET_URI: "http://keycloak:8080/realms/streamsphere/protocol/openid-connect/certs"
+  STREAMSPHERE_SERVICE_AUTH_TOKEN_URI: "http://keycloak:8080/realms/streamsphere/protocol/openid-connect/token"
+  SPRING_RABBITMQ_HOST: "rabbitmq"
+  SPRING_DATA_REDIS_HOST: "valkey"
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/catalog"
+  CATALOG_URL: "http://catalog:8080"
+  CREATOR_URL: "http://creator:8080"
+  MEDIA_URL: "http://media:8080"
+  RECOMMENDATIONS_URL: "http://recommendations:8080"
+secretEnvFrom: [catalog-db, rabbitmq-credentials, catalog-service-client]
+resources: { requests: { cpu: 50m, memory: 256Mi }, limits: { cpu: 500m, memory: 384Mi } }
+networkPolicy: { enabled: true, allowFromIngress: false, allowFrom: [gateway, upload, playback] }

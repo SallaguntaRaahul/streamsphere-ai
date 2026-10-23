@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}
+  labels: {{- include "ss.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  revisionHistoryLimit: 3
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector: { matchLabels: { app.kubernetes.io/name: {{ .Values.name }} } }
+  template:
+    metadata:
+      labels: {{- include "ss.labels" . | nindent 8 }}
+      annotations: { checksum/config: {{ toJson .Values.env | sha256sum | trunc 16 }} }
+    spec:
+      serviceAccountName: {{ .Values.name }}
+      automountServiceAccountToken: {{ .Values.jobLauncher.enabled }}
+      terminationGracePeriodSeconds: 30
+      securityContext: { runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: app
+          image: {{ include "ss.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports: [{ name: http, containerPort: {{ .Values.port }} }]
+          env:
+            - { name: SERVER_PORT, value: "{{ .Values.port }}" }
+            - { name: JAVA_TOOL_OPTIONS, value: {{ .Values.javaOpts | quote }} }
+            {{- range $k, $v := .Values.env }}
+            - { name: {{ $k }}, value: {{ $v | quote }} }
+            {{- end }}
+          {{- with .Values.secretEnvFrom }}
+          envFrom:
+            {{- range . }}
+            - secretRef: { name: {{ . }} }
+            {{- end }}
+          {{- end }}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          startupProbe:  { httpGet: { path: {{ .Values.probes.path }}/liveness, port: http }, periodSeconds: 5, failureThreshold: 36 }
+          livenessProbe: { httpGet: { path: {{ .Values.probes.path }}/liveness, port: http }, periodSeconds: 15, failureThreshold: 3 }
+          readinessProbe: { httpGet: { path: {{ .Values.probes.path }}/readiness, port: http }, periodSeconds: 10, failureThreshold: 3 }
+          lifecycle: { preStop: { sleep: { seconds: 5 } } }
+          securityContext: { readOnlyRootFilesystem: true, allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+      volumes: [{ name: tmp, emptyDir: { sizeLimit: 256Mi } }]

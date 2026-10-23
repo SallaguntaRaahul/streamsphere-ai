@@ -1,0 +1,7 @@
+apiVersion: v2
+name: streamsphere-service
+description: One independently deployable StreamSphere microservice (used once per service with its own values file)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+maintainers: [{ name: Raahul Sallagunta }]

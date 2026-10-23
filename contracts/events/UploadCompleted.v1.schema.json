@@ -1,0 +1,42 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "UploadCompleted.v1.schema.json",
+ "title": "UploadCompleted.v1 payload",
+ "description": "Routing key UploadCompleted.v1 on exchange streamsphere.events. Producer: upload. Consumers: media",
+ "type": "object",
+ "required": [
+  "uploadId",
+  "titleId"
+ ],
+ "properties": {
+  "uploadId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "titleId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "creatorId": {
+   "type": "string"
+  },
+  "bucket": {
+   "type": "string"
+  },
+  "objectKey": {
+   "type": "string"
+  },
+  "sizeBytes": {
+   "type": "integer"
+  },
+  "contentType": {
+   "type": "string"
+  },
+  "sha256": {
+   "type": "string"
+  },
+  "provider": {
+   "type": "string"
+  }
+ }
+}

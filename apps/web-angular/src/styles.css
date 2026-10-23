@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+/* StreamSphere design tokens — original cinematic identity (aurora violet + lagoon teal on deep ink). */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Sora", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-ink-950: #07080d;
+  --color-ink-900: #0c0e16;
+  --color-ink-850: #10131e;
+  --color-ink-800: #161a29;
+  --color-ink-700: #212640;
+  --color-ink-600: #2c3252;
+  --color-ink-400: #8a90b0;
+  --color-ink-300: #a9aecb;
+  --color-ink-100: #dcdef0;
+  --color-ink-50: #f1f2fa;
+  --color-aurora-300: #b9a8ff;
+  --color-aurora-400: #9b84ff;
+  --color-aurora-500: #7c5cff;
+  --color-aurora-600: #6440f0;
+  --color-lagoon-300: #7ff3df;
+  --color-lagoon-400: #2ee6c5;
+  --color-ember-400: #ff8a5b;
+  --color-rose-400: #ff5c8a;
+  --shadow-glow: 0 0 0 1px rgb(124 92 255 / 0.35), 0 12px 40px -12px rgb(124 92 255 / 0.55);
+  --animate-rise: rise 0.5s cubic-bezier(.2,.7,.2,1) both;
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  @keyframes shimmer { from { background-position: -400px 0; } to { background-position: 400px 0; } }
+}
+
+@layer base {
+  html { color-scheme: dark; scroll-behavior: smooth; }
+  body { font-family: var(--font-sans); min-height: 100dvh; }
+  h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; }
+  :focus-visible { outline: 2px solid var(--color-lagoon-400); outline-offset: 3px; border-radius: 6px; }
+  ::selection { background: rgb(124 92 255 / 0.45); }
+}
+
+@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed; }
+@utility btn-primary { @apply btn bg-ink-50 text-ink-950 hover:bg-white hover:shadow-glow; }
+@utility btn-accent { @apply btn bg-aurora-600 text-white hover:bg-aurora-500 hover:shadow-glow; }
+@utility btn-ghost { @apply btn bg-white/8 text-ink-50 ring-1 ring-white/12 hover:bg-white/14 backdrop-blur; }
+@utility btn-danger { @apply btn bg-rose-400/15 text-rose-400 ring-1 ring-rose-400/40 hover:bg-rose-400/25; }
+@utility card { @apply rounded-2xl bg-ink-850/80 ring-1 ring-white/6 backdrop-blur; }
+@utility field { @apply w-full rounded-xl bg-ink-900 px-4 py-2.5 text-sm text-ink-50 ring-1 ring-white/10 placeholder:text-ink-400 focus:ring-2 focus:ring-aurora-500 focus:outline-none; }
+@utility label { @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink-300; }
+@utility chip-on { @apply bg-aurora-600 text-white; }
+@utility chip { @apply inline-flex items-center rounded-full bg-white/8 px-2.5 py-0.5 text-xs font-medium text-ink-100 ring-1 ring-white/10; }
+@utility skeleton { @apply rounded-xl bg-ink-800; background-image: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.05), transparent); background-size: 400px 100%; animation: var(--animate-shimmer); }
+@utility page { @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-10; }
+@utility eyebrow { @apply text-xs font-semibold uppercase tracking-[0.2em] text-lagoon-400; }
+
+/* Reduced motion: OS preference OR the user's profile setting (html.reduce-motion) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+video::cue { background: rgb(7 8 13 / 0.78); color: #f1f2fa; font-family: var(--font-sans); }
+
+/* lift native caption rendering above the player controls while they are visible */
+.chrome-on video::-webkit-media-text-track-container { transform: translateY(-130px); transition: transform .2s; }

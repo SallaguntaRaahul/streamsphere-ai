@@ -1,0 +1,23 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "PlaybackCompleted.v1.schema.json",
+ "title": "PlaybackCompleted.v1 payload",
+ "description": "Routing key PlaybackCompleted.v1 on exchange streamsphere.events. Producer: history. Consumers: analytics, recommendations",
+ "type": "object",
+ "required": [
+  "userId",
+  "titleId"
+ ],
+ "properties": {
+  "userId": {
+   "type": "string"
+  },
+  "titleId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "durationSeconds": {
+   "type": "integer"
+  }
+ }
+}

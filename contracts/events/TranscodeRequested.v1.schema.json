@@ -1,0 +1,49 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "TranscodeRequested.v1.schema.json",
+ "title": "TranscodeRequested.v1 payload",
+ "description": "Routing key TranscodeRequested.v1 on exchange streamsphere.events. Producer: media. Consumers: ffmpeg-worker",
+ "type": "object",
+ "required": [
+  "jobId",
+  "assetId"
+ ],
+ "properties": {
+  "jobId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "assetId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "titleId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "attempt": {
+   "type": "integer"
+  },
+  "sourceBucket": {
+   "type": "string"
+  },
+  "sourceKey": {
+   "type": "string"
+  },
+  "sourceSha256": {
+   "type": "string"
+  },
+  "outputBucket": {
+   "type": "string"
+  },
+  "outputPrefix": {
+   "type": "string"
+  },
+  "maxHeight": {
+   "type": "integer"
+  },
+  "segmentSeconds": {
+   "type": "integer"
+  }
+ }
+}

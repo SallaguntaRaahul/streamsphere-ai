@@ -1,0 +1,27 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "MediaProcessingStarted.v1.schema.json",
+ "title": "MediaProcessingStarted.v1 payload",
+ "description": "Routing key MediaProcessingStarted.v1 on exchange streamsphere.events. Producer: media. Consumers: catalog",
+ "type": "object",
+ "required": [
+  "assetId",
+  "titleId"
+ ],
+ "properties": {
+  "assetId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "titleId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "version": {
+   "type": "integer"
+  },
+  "attempt": {
+   "type": "integer"
+  }
+ }
+}

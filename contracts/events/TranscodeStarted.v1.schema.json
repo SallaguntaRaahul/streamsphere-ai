@@ -1,0 +1,21 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "TranscodeStarted.v1.schema.json",
+ "title": "TranscodeStarted.v1 payload",
+ "description": "Routing key TranscodeStarted.v1 on exchange streamsphere.events. Producer: ffmpeg-worker. Consumers: media",
+ "type": "object",
+ "required": [
+  "jobId",
+  "assetId"
+ ],
+ "properties": {
+  "jobId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "assetId": {
+   "type": "string",
+   "format": "uuid"
+  }
+ }
+}

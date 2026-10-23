@@ -1,0 +1,552 @@
+{
+ "realm": "streamsphere",
+ "enabled": true,
+ "displayName": "StreamSphere AI",
+ "registrationAllowed": true,
+ "registrationEmailAsUsername": false,
+ "loginWithEmailAllowed": true,
+ "resetPasswordAllowed": false,
+ "bruteForceProtected": true,
+ "failureFactor": 10,
+ "accessTokenLifespan": 900,
+ "ssoSessionIdleTimeout": 3600,
+ "sslRequired": "external",
+ "passwordPolicy": "length(10)",
+ "roles": {
+  "realm": [
+   {
+    "name": "viewer"
+   },
+   {
+    "name": "moderator"
+   },
+   {
+    "name": "admin"
+   },
+   {
+    "name": "service",
+    "description": "service-to-service calls"
+   }
+  ]
+ },
+ "defaultRole": {
+  "name": "default-roles-streamsphere",
+  "composite": true,
+  "composites": {
+   "realm": [
+    "viewer",
+    "offline_access"
+   ]
+  }
+ },
+ "clients": [
+  {
+   "clientId": "streamsphere-web",
+   "name": "StreamSphere Web",
+   "publicClient": true,
+   "standardFlowEnabled": true,
+   "directAccessGrantsEnabled": false,
+   "implicitFlowEnabled": false,
+   "redirectUris": [
+    "http://localhost:4200/*",
+    "http://127.0.0.1:4200/*"
+   ],
+   "webOrigins": [
+    "http://localhost:4200",
+    "http://127.0.0.1:4200"
+   ],
+   "attributes": {
+    "pkce.code.challenge.method": "S256",
+    "post.logout.redirect.uris": "http://localhost:4200/*"
+   },
+   "protocolMappers": [
+    {
+     "name": "audience-streamsphere-api",
+     "protocol": "openid-connect",
+     "protocolMapper": "oidc-audience-mapper",
+     "config": {
+      "included.custom.audience": "streamsphere-api",
+      "access.token.claim": "true",
+      "id.token.claim": "false",
+      "introspection.token.claim": "true"
+     }
+    }
+   ]
+  },
+  {
+   "clientId": "streamsphere-e2e",
+   "name": "E2E test client (local only)",
+   "publicClient": true,
+   "standardFlowEnabled": false,
+   "directAccessGrantsEnabled": true,
+   "protocolMappers": [
+    {
+     "name": "audience-streamsphere-api",
+     "protocol": "openid-connect",
+     "protocolMapper": "oidc-audience-mapper",
+     "config": {
+      "included.custom.audience": "streamsphere-api",
+      "access.token.claim": "true",
+      "id.token.claim": "false",
+      "introspection.token.claim": "true"
+     }
+    }
+   ]
+  },
+  {
+   "clientId": "svc-playback",
+   "secret": "playback-local-secret",
+   "publicClient": false,
+   "serviceAccountsEnabled": true,
+   "standardFlowEnabled": false,
+   "directAccessGrantsEnabled": false,
+   "clientAuthenticatorType": "client-secret",
+   "protocolMappers": [
+    {
+     "name": "audience-streamsphere-api",
+     "protocol": "openid-connect",
+     "protocolMapper": "oidc-audience-mapper",
+     "config": {
+      "included.custom.audience": "streamsphere-api",
+      "access.token.claim": "true",
+      "id.token.claim": "false",
+      "introspection.token.claim": "true"
+     }
+    }
+   ]
+  },
+  {
+   "clientId": "svc-search",
+   "secret": "search-local-secret",
+   "publicClient": false,
+   "serviceAccountsEnabled": true,
+   "standardFlowEnabled": false,
+   "directAccessGrantsEnabled": false,
+   "clientAuthenticatorType": "client-secret",
+   "protocolMappers": [
+    {
+     "name": "audience-streamsphere-api",
+     "protocol": "openid-connect",
+     "protocolMapper": "oidc-audience-mapper",
+     "config": {
+      "included.custom.audience": "streamsphere-api",
+      "access.token.claim": "true",
+      "id.token.claim": "false",
+      "introspection.token.claim": "true"
+     }
+    }
+   ]
+  },
+  {
+   "clientId": "svc-catalog",
+   "secret": "catalog-local-secret",
+   "publicClient": false,
+   "serviceAccountsEnabled": true,
+   "standardFlowEnabled": false,
+   "directAccessGrantsEnabled": false,
+   "clientAuthenticatorType": "client-secret",
+   "protocolMappers": [
+    {
+     "name": "audience-streamsphere-api",
+     "protocol": "openid-connect",
+     "protocolMapper": "oidc-audience-mapper",
+     "config": {
+      "included.custom.audience": "streamsphere-api",
+      "access.token.claim": "true",
+      "id.token.claim": "false",
+      "introspection.token.claim": "true"
+     }
+    }
+   ]
+  },
+  {
+   "clientId": "svc-media",
+   "secret": "media-local-secret",
+   "publicClient": false,
+   "serviceAccountsEnabled": true,
+   "standardFlowEnabled": false,
+   "directAccessGrantsEnabled": false,
+   "clientAuthenticatorType": "client-secret",
+   "protocolMappers": [
+    {
+     "name": "audience-streamsphere-api",
+     "protocol": "openid-connect",
+     "protocolMapper": "oidc-audience-mapper",
+     "config": {
+      "included.custom.audience": "streamsphere-api",
+      "access.token.claim": "true",
+      "id.token.claim": "false",
+      "introspection.token.claim": "true"
+     }
+    }
+   ]
+  },
+  {
+   "clientId": "svc-upload",
+   "secret": "upload-local-secret",
+   "publicClient": false,
+   "serviceAccountsEnabled": true,
+   "standardFlowEnabled": false,
+   "directAccessGrantsEnabled": false,
+   "clientAuthenticatorType": "client-secret",
+   "protocolMappers": [
+    {
+     "name": "audience-streamsphere-api",
+     "protocol": "openid-connect",
+     "protocolMapper": "oidc-audience-mapper",
+     "config": {
+      "included.custom.audience": "streamsphere-api",
+      "access.token.claim": "true",
+      "id.token.claim": "false",
+      "introspection.token.claim": "true"
+     }
+    }
+   ]
+  },
+  {
+   "clientId": "svc-analytics",
+   "secret": "analytics-local-secret",
+   "publicClient": false,
+   "serviceAccountsEnabled": true,
+   "standardFlowEnabled": false,
+   "directAccessGrantsEnabled": false,
+   "clientAuthenticatorType": "client-secret",
+   "protocolMappers": [
+    {
+     "name": "audience-streamsphere-api",
+     "protocol": "openid-connect",
+     "protocolMapper": "oidc-audience-mapper",
+     "config": {
+      "included.custom.audience": "streamsphere-api",
+      "access.token.claim": "true",
+      "id.token.claim": "false",
+      "introspection.token.claim": "true"
+     }
+    }
+   ]
+  },
+  {
+   "clientId": "svc-recommendations",
+   "secret": "recommendations-local-secret",
+   "publicClient": false,
+   "serviceAccountsEnabled": true,
+   "standardFlowEnabled": false,
+   "directAccessGrantsEnabled": false,
+   "clientAuthenticatorType": "client-secret",
+   "protocolMappers": [
+    {
+     "name": "audience-streamsphere-api",
+     "protocol": "openid-connect",
+     "protocolMapper": "oidc-audience-mapper",
+     "config": {
+      "included.custom.audience": "streamsphere-api",
+      "access.token.claim": "true",
+      "id.token.claim": "false",
+      "introspection.token.claim": "true"
+     }
+    }
+   ]
+  },
+  {
+   "clientId": "svc-moderation",
+   "secret": "moderation-local-secret",
+   "publicClient": false,
+   "serviceAccountsEnabled": true,
+   "standardFlowEnabled": false,
+   "directAccessGrantsEnabled": false,
+   "clientAuthenticatorType": "client-secret",
+   "protocolMappers": [
+    {
+     "name": "audience-streamsphere-api",
+     "protocol": "openid-connect",
+     "protocolMapper": "oidc-audience-mapper",
+     "config": {
+      "included.custom.audience": "streamsphere-api",
+      "access.token.claim": "true",
+      "id.token.claim": "false",
+      "introspection.token.claim": "true"
+     }
+    }
+   ]
+  },
+  {
+   "clientId": "svc-history",
+   "secret": "history-local-secret",
+   "publicClient": false,
+   "serviceAccountsEnabled": true,
+   "standardFlowEnabled": false,
+   "directAccessGrantsEnabled": false,
+   "clientAuthenticatorType": "client-secret",
+   "protocolMappers": [
+    {
+     "name": "audience-streamsphere-api",
+     "protocol": "openid-connect",
+     "protocolMapper": "oidc-audience-mapper",
+     "config": {
+      "included.custom.audience": "streamsphere-api",
+      "access.token.claim": "true",
+      "id.token.claim": "false",
+      "introspection.token.claim": "true"
+     }
+    }
+   ]
+  },
+  {
+   "clientId": "svc-notifications",
+   "secret": "notifications-local-secret",
+   "publicClient": false,
+   "serviceAccountsEnabled": true,
+   "standardFlowEnabled": false,
+   "directAccessGrantsEnabled": false,
+   "clientAuthenticatorType": "client-secret",
+   "protocolMappers": [
+    {
+     "name": "audience-streamsphere-api",
+     "protocol": "openid-connect",
+     "protocolMapper": "oidc-audience-mapper",
+     "config": {
+      "included.custom.audience": "streamsphere-api",
+      "access.token.claim": "true",
+      "id.token.claim": "false",
+      "introspection.token.claim": "true"
+     }
+    }
+   ]
+  },
+  {
+   "clientId": "svc-creator",
+   "secret": "creator-local-secret",
+   "publicClient": false,
+   "serviceAccountsEnabled": true,
+   "standardFlowEnabled": false,
+   "directAccessGrantsEnabled": false,
+   "clientAuthenticatorType": "client-secret",
+   "protocolMappers": [
+    {
+     "name": "audience-streamsphere-api",
+     "protocol": "openid-connect",
+     "protocolMapper": "oidc-audience-mapper",
+     "config": {
+      "included.custom.audience": "streamsphere-api",
+      "access.token.claim": "true",
+      "id.token.claim": "false",
+      "introspection.token.claim": "true"
+     }
+    }
+   ]
+  },
+  {
+   "clientId": "svc-profile",
+   "secret": "profile-local-secret",
+   "publicClient": false,
+   "serviceAccountsEnabled": true,
+   "standardFlowEnabled": false,
+   "directAccessGrantsEnabled": false,
+   "clientAuthenticatorType": "client-secret",
+   "protocolMappers": [
+    {
+     "name": "audience-streamsphere-api",
+     "protocol": "openid-connect",
+     "protocolMapper": "oidc-audience-mapper",
+     "config": {
+      "included.custom.audience": "streamsphere-api",
+      "access.token.claim": "true",
+      "id.token.claim": "false",
+      "introspection.token.claim": "true"
+     }
+    }
+   ]
+  }
+ ],
+ "users": [
+  {
+   "username": "service-account-svc-playback",
+   "enabled": true,
+   "serviceAccountClientId": "svc-playback",
+   "realmRoles": [
+    "service"
+   ]
+  },
+  {
+   "username": "service-account-svc-search",
+   "enabled": true,
+   "serviceAccountClientId": "svc-search",
+   "realmRoles": [
+    "service"
+   ]
+  },
+  {
+   "username": "service-account-svc-catalog",
+   "enabled": true,
+   "serviceAccountClientId": "svc-catalog",
+   "realmRoles": [
+    "service"
+   ]
+  },
+  {
+   "username": "service-account-svc-media",
+   "enabled": true,
+   "serviceAccountClientId": "svc-media",
+   "realmRoles": [
+    "service"
+   ]
+  },
+  {
+   "username": "service-account-svc-upload",
+   "enabled": true,
+   "serviceAccountClientId": "svc-upload",
+   "realmRoles": [
+    "service"
+   ]
+  },
+  {
+   "username": "service-account-svc-analytics",
+   "enabled": true,
+   "serviceAccountClientId": "svc-analytics",
+   "realmRoles": [
+    "service"
+   ]
+  },
+  {
+   "username": "service-account-svc-recommendations",
+   "enabled": true,
+   "serviceAccountClientId": "svc-recommendations",
+   "realmRoles": [
+    "service"
+   ]
+  },
+  {
+   "username": "service-account-svc-moderation",
+   "enabled": true,
+   "serviceAccountClientId": "svc-moderation",
+   "realmRoles": [
+    "service"
+   ]
+  },
+  {
+   "username": "service-account-svc-history",
+   "enabled": true,
+   "serviceAccountClientId": "svc-history",
+   "realmRoles": [
+    "service"
+   ]
+  },
+  {
+   "username": "service-account-svc-notifications",
+   "enabled": true,
+   "serviceAccountClientId": "svc-notifications",
+   "realmRoles": [
+    "service"
+   ]
+  },
+  {
+   "username": "service-account-svc-creator",
+   "enabled": true,
+   "serviceAccountClientId": "svc-creator",
+   "realmRoles": [
+    "service"
+   ]
+  },
+  {
+   "username": "service-account-svc-profile",
+   "enabled": true,
+   "serviceAccountClientId": "svc-profile",
+   "realmRoles": [
+    "service"
+   ]
+  },
+  {
+   "username": "viewer",
+   "email": "viewer@streamsphere.local",
+   "emailVerified": true,
+   "enabled": true,
+   "firstName": "Vera",
+   "lastName": "Demo",
+   "credentials": [
+    {
+     "type": "password",
+     "value": "viewer-pass-123",
+     "temporary": false
+    }
+   ],
+   "realmRoles": [
+    "default-roles-streamsphere"
+   ]
+  },
+  {
+   "username": "creator",
+   "email": "creator@streamsphere.local",
+   "emailVerified": true,
+   "enabled": true,
+   "firstName": "Cyrus",
+   "lastName": "Demo",
+   "credentials": [
+    {
+     "type": "password",
+     "value": "creator-pass-123",
+     "temporary": false
+    }
+   ],
+   "realmRoles": [
+    "default-roles-streamsphere"
+   ]
+  },
+  {
+   "username": "creator2",
+   "email": "creator2@streamsphere.local",
+   "emailVerified": true,
+   "enabled": true,
+   "firstName": "Chloe",
+   "lastName": "Demo",
+   "credentials": [
+    {
+     "type": "password",
+     "value": "creator2-pass-123",
+     "temporary": false
+    }
+   ],
+   "realmRoles": [
+    "default-roles-streamsphere"
+   ]
+  },
+  {
+   "username": "moderator",
+   "email": "moderator@streamsphere.local",
+   "emailVerified": true,
+   "enabled": true,
+   "firstName": "Mona",
+   "lastName": "Demo",
+   "credentials": [
+    {
+     "type": "password",
+     "value": "moderator-pass-123",
+     "temporary": false
+    }
+   ],
+   "realmRoles": [
+    "default-roles-streamsphere",
+    "moderator"
+   ]
+  },
+  {
+   "username": "admin",
+   "email": "admin@streamsphere.local",
+   "emailVerified": true,
+   "enabled": true,
+   "firstName": "Ada",
+   "lastName": "Demo",
+   "credentials": [
+    {
+     "type": "password",
+     "value": "admin-pass-123",
+     "temporary": false
+    }
+   ],
+   "realmRoles": [
+    "default-roles-streamsphere",
+    "admin",
+    "moderator"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,24 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "MediaAssetsDeleted.v1.schema.json",
+ "title": "MediaAssetsDeleted.v1 payload",
+ "description": "Routing key MediaAssetsDeleted.v1 on exchange streamsphere.events. Producer: media. Consumers: upload",
+ "type": "object",
+ "required": [
+  "titleId",
+  "assetIds"
+ ],
+ "properties": {
+  "titleId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "assetIds": {
+   "type": "array",
+   "items": {
+    "type": "string",
+    "format": "uuid"
+   }
+  }
+ }
+}

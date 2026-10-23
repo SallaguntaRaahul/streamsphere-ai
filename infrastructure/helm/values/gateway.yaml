@@ -1,0 +1,13 @@
+name: gateway
+image: { repository: ghcr.io/OWNER/streamsphere-gateway, tag: "0.1.0" }
+env:
+  STREAMSPHERE_SECURITY_ISSUER: "https://auth.example.invalid/realms/streamsphere"
+  STREAMSPHERE_SECURITY_JWK_SET_URI: "http://keycloak:8080/realms/streamsphere/protocol/openid-connect/certs"
+  CATALOG_URL: "http://catalog:8080"
+  CREATOR_URL: "http://creator:8080"
+  MEDIA_URL: "http://media:8080"
+  RECOMMENDATIONS_URL: "http://recommendations:8080"
+secretEnvFrom: []
+resources: { requests: { cpu: 50m, memory: 256Mi }, limits: { cpu: 500m, memory: 320Mi } }
+networkPolicy: { enabled: true, allowFromIngress: true, allowFrom: [] }
+ingress: { enabled: true, host: api.example.invalid, paths: [/api] }

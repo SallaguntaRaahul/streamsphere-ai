@@ -1,0 +1,11 @@
+# Overlay: media launches FFmpeg as Kubernetes Jobs on the local k3s cluster (scripts/k8s-local-up.sh).
+# docker compose -f compose.yaml -f compose.k8s.yaml up -d media
+services:
+  media:
+    environment:
+      TRANSCODE_LAUNCHER: k8s-job
+      KUBECONFIG: /kube/config
+      FFMPEG_WORKER_IMAGE: streamsphere/ffmpeg-worker:local
+    volumes: ["./infrastructure/kubernetes/.kubeconfig.incluster:/kube/config:ro"]
+  ffmpeg-worker:
+    deploy: { replicas: 0 }   # no queue consumer: Jobs do the work

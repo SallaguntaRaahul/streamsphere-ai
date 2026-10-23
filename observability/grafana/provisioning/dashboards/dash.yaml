@@ -1,0 +1,3 @@
+apiVersion: 1
+providers:
+  - { name: streamsphere, folder: StreamSphere, type: file, options: { path: /var/lib/grafana/dashboards } }

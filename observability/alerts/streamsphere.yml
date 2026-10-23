@@ -1,0 +1,39 @@
+# Alert rules. Thresholds map to SLO *targets* in docs/architecture/RELIABILITY.md (not guarantees).
+groups:
+  - name: streamsphere-slo
+    rules:
+      - alert: HighErrorRate
+        expr: sum by (service) (rate(http_server_requests_seconds_count{status=~"5.."}[5m])) / sum by (service) (rate(http_server_requests_seconds_count[5m])) > 0.02
+        for: 10m
+        labels: { severity: page }
+        annotations: { summary: "{{ $labels.service }} 5xx > 2%", runbook: docs/runbooks/high-error-rate.md }
+      - alert: PlaybackAuthSlow
+        expr: histogram_quantile(0.95, sum by (le) (rate(streamsphere_playback_authorization_seconds_bucket[5m]))) > 0.3
+        for: 10m
+        labels: { severity: ticket }
+        annotations: { summary: "playback auth p95 > 300 ms", runbook: docs/runbooks/playback-latency.md }
+      - alert: EventsDeadLettered
+        expr: increase(streamsphere_events_dlq_total[15m]) > 0
+        labels: { severity: ticket }
+        annotations: { summary: "events dead-lettered in {{ $labels.service }}", runbook: docs/runbooks/dlq-replay.md }
+      - alert: TranscodeQueueBacklog
+        expr: rabbitmq_queue_messages_ready{queue="ffmpeg-worker.requests"} > 5
+        for: 15m
+        labels: { severity: ticket }
+        annotations: { summary: "transcode backlog > 5 for 15 min", runbook: docs/runbooks/transcode-backlog.md }
+      - alert: CostQuotaWarning
+        expr: streamsphere_cost_quota_ratio > 0.70
+        labels: { severity: ticket }
+        annotations: { summary: "storage estimate at {{ $value | humanizePercentage }} of free-tier budget", runbook: docs/runbooks/cost-guard.md }
+      - alert: CostQuotaStop
+        expr: streamsphere_cost_quota_ratio >= 0.95
+        labels: { severity: page }
+        annotations: { summary: "uploads paused by cost guard", runbook: docs/runbooks/cost-guard.md }
+      - alert: OutboxRelayFailing
+        expr: increase(streamsphere_outbox_publish_failures_total[10m]) > 5
+        labels: { severity: page }
+        annotations: { summary: "outbox relay failing in {{ $labels.service }} (broker down?)", runbook: docs/runbooks/broker-outage.md }
+      - alert: CacheErrors
+        expr: increase(streamsphere_cache_errors_total[10m]) > 50
+        labels: { severity: info }
+        annotations: { summary: "cache unavailable — serving from PostgreSQL (degraded performance only)" }

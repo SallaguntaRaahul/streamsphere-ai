@@ -1,0 +1,89 @@
+spring:
+  application.name: gateway
+  http.clients:            # upstream calls fail fast instead of hanging on a restarting pod
+    connect-timeout: 2s
+    read-timeout: 30s
+  threads.virtual.enabled: true
+  cloud:
+    gateway:
+      server:
+        webmvc:
+          routes:
+          - id: catalog
+            uri: ${CATALOG_URL:http://localhost:8082}
+            predicates:
+              - Path=/api/v1/titles,/api/v1/titles/**,/api/v1/genres,/api/v1/creator/titles,/api/v1/creator/titles/**,/api/v1/catalog/**
+          - id: creator
+            uri: ${CREATOR_URL:http://localhost:8083}
+            predicates:
+              - Path=/api/v1/creators,/api/v1/creators/**
+          - id: profile
+            uri: ${PROFILE_URL:http://localhost:8081}
+            predicates:
+              - Path=/api/v1/profiles/**
+          - id: upload
+            uri: ${UPLOAD_URL:http://localhost:8084}
+            predicates:
+              - Path=/api/v1/uploads,/api/v1/uploads/**
+          - id: media
+            uri: ${MEDIA_URL:http://localhost:8085}
+            predicates:
+              - Path=/api/v1/media/**
+          - id: playback
+            uri: ${PLAYBACK_URL:http://localhost:8086}
+            predicates:
+              - Path=/api/v1/playback/**
+          - id: history
+            uri: ${HISTORY_URL:http://localhost:8087}
+            predicates:
+              - Path=/api/v1/history/**,/api/v1/watchlist,/api/v1/watchlist/**
+          - id: search
+            uri: ${SEARCH_URL:http://localhost:8088}
+            predicates:
+              - Path=/api/v1/search,/api/v1/search/**
+          - id: recommendations
+            uri: ${RECOMMENDATIONS_URL:http://localhost:8089}
+            predicates:
+              - Path=/api/v1/recommendations,/api/v1/recommendations/**
+          - id: moderation
+            uri: ${MODERATION_URL:http://localhost:8090}
+            predicates:
+              - Path=/api/v1/moderation/**
+          - id: analytics
+            uri: ${ANALYTICS_URL:http://localhost:8091}
+            predicates:
+              - Path=/api/v1/analytics/**
+          - id: notifications
+            uri: ${NOTIFICATIONS_URL:http://localhost:8092}
+            predicates:
+              - Path=/api/v1/notifications,/api/v1/notifications/**
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+management:
+  endpoints.web.exposure.include: health,info,prometheus
+  endpoint.health.probes.enabled: true
+  tracing.sampling.probability: 1.0
+  metrics.tags.service: gateway
+streamsphere:
+  security:
+    issuer: ${STREAMSPHERE_SECURITY_ISSUER:http://localhost:8180/realms/streamsphere}
+    jwk-set-uri: ${STREAMSPHERE_SECURITY_JWK_SET_URI:http://localhost:8180/realms/streamsphere/protocol/openid-connect/certs}
+  cors.origins: ${CORS_ORIGINS:http://localhost:4200,http://127.0.0.1:4200}
+  http.max-request-bytes: 1048576
+  upstreams:
+    catalog: ${CATALOG_URL:http://localhost:8082}
+    creator: ${CREATOR_URL:http://localhost:8083}
+    profile: ${PROFILE_URL:http://localhost:8081}
+    upload: ${UPLOAD_URL:http://localhost:8084}
+    media: ${MEDIA_URL:http://localhost:8085}
+    playback: ${PLAYBACK_URL:http://localhost:8086}
+    history: ${HISTORY_URL:http://localhost:8087}
+    search: ${SEARCH_URL:http://localhost:8088}
+    recommendations: ${RECOMMENDATIONS_URL:http://localhost:8089}
+    moderation: ${MODERATION_URL:http://localhost:8090}
+    analytics: ${ANALYTICS_URL:http://localhost:8091}
+    notifications: ${NOTIFICATIONS_URL:http://localhost:8092}
+---
+spring.config.activate.on-profile: docker
+logging.structured.format.console: ecs

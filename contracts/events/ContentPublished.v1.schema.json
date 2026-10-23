@@ -1,0 +1,58 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "ContentPublished.v1.schema.json",
+ "title": "ContentPublished.v1 payload",
+ "description": "Routing key ContentPublished.v1 on exchange streamsphere.events. Producer: catalog. Consumers: search, recommendations, analytics, media, moderation, notifications",
+ "type": "object",
+ "required": [
+  "titleId",
+  "creatorId"
+ ],
+ "properties": {
+  "titleId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "creatorId": {
+   "type": "string"
+  },
+  "creatorName": {
+   "type": "string"
+  },
+  "title": {
+   "type": "string"
+  },
+  "synopsis": {
+   "type": "string"
+  },
+  "genres": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "language": {
+   "type": "string"
+  },
+  "maturityRating": {
+   "type": "string"
+  },
+  "releaseYear": {
+   "type": "integer"
+  },
+  "durationSeconds": {
+   "type": "integer"
+  },
+  "mediaAssetId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "mediaVersion": {
+   "type": "integer"
+  },
+  "publishedAt": {
+   "type": "string",
+   "format": "date-time"
+  }
+ }
+}

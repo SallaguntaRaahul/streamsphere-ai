@@ -1,0 +1,19 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "CreatorRegistered.v1.schema.json",
+ "title": "CreatorRegistered.v1 payload",
+ "description": "Routing key CreatorRegistered.v1 on exchange streamsphere.events. Producer: creator. Consumers: (none yet)",
+ "type": "object",
+ "required": [
+  "creatorId",
+  "displayName"
+ ],
+ "properties": {
+  "creatorId": {
+   "type": "string"
+  },
+  "displayName": {
+   "type": "string"
+  }
+ }
+}

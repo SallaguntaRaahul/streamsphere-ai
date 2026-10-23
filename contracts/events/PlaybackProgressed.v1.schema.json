@@ -1,0 +1,29 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "PlaybackProgressed.v1.schema.json",
+ "title": "PlaybackProgressed.v1 payload",
+ "description": "Routing key PlaybackProgressed.v1 on exchange streamsphere.events. Producer: history. Consumers: analytics, recommendations",
+ "type": "object",
+ "required": [
+  "userId",
+  "titleId"
+ ],
+ "properties": {
+  "userId": {
+   "type": "string"
+  },
+  "titleId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "positionSeconds": {
+   "type": "integer"
+  },
+  "durationSeconds": {
+   "type": "integer"
+  },
+  "milestonePercent": {
+   "type": "integer"
+  }
+ }
+}

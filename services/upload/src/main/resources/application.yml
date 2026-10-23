@@ -1,0 +1,60 @@
+spring:
+  application.name: upload
+  threads.virtual.enabled: true
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:15432}/upload
+    username: upload_svc
+    password: ${DB_PASSWORD:upload_local_pw}
+    hikari.maximum-pool-size: 6
+  flyway.locations: classpath:db/migration,classpath:db/common
+  rabbitmq:
+    publisher-confirm-type: simple
+    username: ${RABBITMQ_USER:streamsphere}
+    password: ${RABBITMQ_PASSWORD:local-rabbit-pw}
+  data.redis:
+    port: ${REDIS_PORT:16379}
+    timeout: 300ms
+server:
+  port: ${SERVER_PORT:8084}
+  shutdown: graceful
+management:
+  endpoints.web.exposure.include: health,info,prometheus
+  endpoint.health.probes.enabled: true
+  tracing.sampling.probability: 1.0
+  metrics.tags.service: ${spring.application.name}
+streamsphere:
+  service-name: upload
+  security:
+    issuer: ${STREAMSPHERE_SECURITY_ISSUER:http://localhost:8180/realms/streamsphere}
+    jwk-set-uri: ${STREAMSPHERE_SECURITY_JWK_SET_URI:http://localhost:8180/realms/streamsphere/protocol/openid-connect/certs}
+    public-paths: [/api/v1/internal/tus/hooks]   # authenticated by shared secret + forwarded user JWT
+  service-auth:
+    token-uri: ${STREAMSPHERE_SERVICE_AUTH_TOKEN_URI:http://localhost:8180/realms/streamsphere/protocol/openid-connect/token}
+    client-id: svc-upload
+    client-secret: ${SERVICE_CLIENT_SECRET:upload-local-secret}
+  services:
+    catalog: ${CATALOG_URL:http://localhost:8082}
+    creator: ${CREATOR_URL:http://localhost:8083}
+  storage:
+    provider: ${STORAGE_PROVIDER:minio}
+    endpoint: ${STORAGE_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${STORAGE_PUBLIC_ENDPOINT:http://localhost:9000}
+    region: ${STORAGE_REGION:us-east-1}
+    access-key: ${STORAGE_ACCESS_KEY:streamsphere}
+    secret-key: ${STORAGE_SECRET_KEY:local-minio-pw-123}
+  upload:
+    bucket: ${UPLOAD_BUCKET:streamsphere-uploads}
+    max-bytes: ${MAX_UPLOAD_BYTES:2147483648}
+    part-size-bytes: 8388608
+    part-url-ttl: 15m
+    session-ttl: 24h
+    source-retention-after-ready: ${SOURCE_RETENTION:7d}
+    allowed-content-types: [video/mp4, video/quicktime, video/webm, video/x-matroska]
+    storage-quota-bytes: ${STORAGE_QUOTA_BYTES:8000000000}
+    stop-ratio: ${COST_GUARD_STOP_RATIO:0.95}
+    tus-hook-secret: ${TUS_HOOK_SECRET:}
+---
+spring.config.activate.on-profile: docker
+spring.datasource.url: jdbc:postgresql://postgres:5432/upload
+spring.data.redis.port: 6379
+logging.structured.format.console: ecs

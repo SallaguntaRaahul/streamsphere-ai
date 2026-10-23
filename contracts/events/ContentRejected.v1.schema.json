@@ -1,0 +1,33 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "ContentRejected.v1.schema.json",
+ "title": "ContentRejected.v1 payload",
+ "description": "Routing key ContentRejected.v1 on exchange streamsphere.events. Producer: moderation. Consumers: catalog, notifications",
+ "type": "object",
+ "required": [
+  "titleId",
+  "creatorId"
+ ],
+ "properties": {
+  "titleId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "creatorId": {
+   "type": "string"
+  },
+  "title": {
+   "type": "string"
+  },
+  "reason": {
+   "type": "string"
+  },
+  "appeal": {
+   "type": "boolean"
+  },
+  "caseId": {
+   "type": "string",
+   "format": "uuid"
+  }
+ }
+}

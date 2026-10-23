@@ -1,0 +1,21 @@
+# OpenTelemetry Collector (local-full). Receives OTLP from services, batches, exports traces to Tempo
+# and logs to Loki (native OTLP endpoint). Metrics are scraped by Prometheus directly.
+receivers:
+  otlp:
+    protocols:
+      http: { endpoint: 0.0.0.0:4318 }
+      grpc: { endpoint: 0.0.0.0:4317 }
+processors:
+  memory_limiter: { check_interval: 1s, limit_mib: 200 }
+  batch: {}
+  attributes/strip-pii:
+    actions:
+      - { key: enduser.id, action: delete }
+      - { key: http.request.header.authorization, action: delete }
+exporters:
+  otlphttp/tempo: { endpoint: http://tempo:4318 }
+  otlphttp/loki: { endpoint: http://loki:3100/otlp }
+service:
+  pipelines:
+    traces: { receivers: [otlp], processors: [memory_limiter, attributes/strip-pii, batch], exporters: [otlphttp/tempo] }
+    logs: { receivers: [otlp], processors: [memory_limiter, attributes/strip-pii, batch], exporters: [otlphttp/loki] }

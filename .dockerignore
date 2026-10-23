@@ -1,0 +1,12 @@
+.git
+.m2
+.npm-cache
+.uv-cache
+**/node_modules
+**/.angular
+apps/web-angular/dist
+tmp
+docs
+tests
+**/__pycache__
+**/.venv

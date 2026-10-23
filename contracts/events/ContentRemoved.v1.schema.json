@@ -1,0 +1,32 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "ContentRemoved.v1.schema.json",
+ "title": "ContentRemoved.v1 payload",
+ "description": "Routing key ContentRemoved.v1 on exchange streamsphere.events. Producer: catalog | moderation. Consumers: catalog, media, playback, search, recommendations, history, upload, moderation, notifications",
+ "type": "object",
+ "required": [
+  "titleId",
+  "creatorId"
+ ],
+ "properties": {
+  "titleId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "creatorId": {
+   "type": "string"
+  },
+  "mediaAssetId": {
+   "type": [
+    "string",
+    "null"
+   ]
+  },
+  "reason": {
+   "type": "string"
+  },
+  "removedBy": {
+   "type": "string"
+  }
+ }
+}

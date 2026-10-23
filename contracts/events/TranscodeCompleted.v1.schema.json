@@ -1,0 +1,60 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "TranscodeCompleted.v1.schema.json",
+ "title": "TranscodeCompleted.v1 payload",
+ "description": "Routing key TranscodeCompleted.v1 on exchange streamsphere.events. Producer: ffmpeg-worker. Consumers: media",
+ "type": "object",
+ "required": [
+  "jobId",
+  "assetId"
+ ],
+ "properties": {
+  "jobId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "assetId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "outputPrefix": {
+   "type": "string"
+  },
+  "durationSeconds": {
+   "type": "integer"
+  },
+  "width": {
+   "type": "integer"
+  },
+  "height": {
+   "type": "integer"
+  },
+  "hasAudio": {
+   "type": "boolean"
+  },
+  "renditions": {
+   "type": "array"
+  },
+  "posterKey": {
+   "type": [
+    "string",
+    "null"
+   ]
+  },
+  "thumbnailCount": {
+   "type": "integer"
+  },
+  "totalBytes": {
+   "type": "integer"
+  },
+  "wallSeconds": {
+   "type": "number"
+  },
+  "cpuSeconds": {
+   "type": "number"
+  },
+  "ffmpegVersion": {
+   "type": "string"
+  }
+ }
+}

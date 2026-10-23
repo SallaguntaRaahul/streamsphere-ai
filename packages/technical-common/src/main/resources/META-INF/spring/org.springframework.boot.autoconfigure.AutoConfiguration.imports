@@ -1,0 +1,7 @@
+ai.streamsphere.common.web.WebAutoConfiguration
+ai.streamsphere.common.security.SecurityAutoConfiguration
+ai.streamsphere.common.http.HttpClientAutoConfiguration
+ai.streamsphere.common.messaging.MessagingAutoConfiguration
+ai.streamsphere.common.cache.CacheAutoConfiguration
+ai.streamsphere.common.storage.StorageAutoConfiguration
+ai.streamsphere.common.observability.OtelLogsAutoConfiguration

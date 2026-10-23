@@ -1,0 +1,19 @@
+spring:
+  application.name: ffmpeg-worker
+  main.web-application-type: none
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    publisher-confirm-type: simple
+    username: ${RABBITMQ_USER:streamsphere}
+    password: ${RABBITMQ_PASSWORD:local-rabbit-pw}
+streamsphere:
+  messaging.enabled: false
+  storage:
+    provider: ${STORAGE_PROVIDER:minio}
+    endpoint: ${STORAGE_ENDPOINT:http://localhost:9000}
+    region: ${STORAGE_REGION:us-east-1}
+    access-key: ${STORAGE_ACCESS_KEY:streamsphere}
+    secret-key: ${STORAGE_SECRET_KEY:local-minio-pw-123}
+worker:
+  work-dir: ${WORK_DIR:/work}
+  fault-injection: ${FAULT_INJECTION:}

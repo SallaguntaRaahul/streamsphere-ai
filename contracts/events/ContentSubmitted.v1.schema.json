@@ -1,0 +1,42 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "ContentSubmitted.v1.schema.json",
+ "title": "ContentSubmitted.v1 payload",
+ "description": "Routing key ContentSubmitted.v1 on exchange streamsphere.events. Producer: catalog. Consumers: moderation",
+ "type": "object",
+ "required": [
+  "titleId",
+  "creatorId"
+ ],
+ "properties": {
+  "titleId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "creatorId": {
+   "type": "string"
+  },
+  "creatorName": {
+   "type": "string"
+  },
+  "title": {
+   "type": "string"
+  },
+  "synopsis": {
+   "type": "string"
+  },
+  "genres": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  },
+  "mediaAssetId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "mediaVersion": {
+   "type": "integer"
+  }
+ }
+}

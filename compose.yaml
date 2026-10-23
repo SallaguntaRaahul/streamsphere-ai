@@ -1,0 +1,603 @@
+# StreamSphere AI — local-core (default) and local-full (--profile full).
+# All host ports bind to 127.0.0.1 only.
+name: streamsphere
+
+x-java: &java
+  restart: unless-stopped
+  environment: &java-env
+    JAVA_TOOL_OPTIONS: "-XX:+UseSerialGC -XX:MaxRAMPercentage=65 -XX:TieredStopAtLevel=1 -Xss512k -XX:ReservedCodeCacheSize=48m -XX:MaxMetaspaceSize=160m -XX:+ExitOnOutOfMemoryError -Dsun.net.inetaddr.negative.ttl=1"
+    SPRING_PROFILES_ACTIVE: docker
+    STREAMSPHERE_SECURITY_ISSUER: http://localhost:8180/realms/streamsphere
+    STREAMSPHERE_SECURITY_JWK_SET_URI: http://keycloak:8080/realms/streamsphere/protocol/openid-connect/certs
+    STREAMSPHERE_SERVICE_AUTH_TOKEN_URI: http://keycloak:8080/realms/streamsphere/protocol/openid-connect/token
+    SPRING_RABBITMQ_HOST: rabbitmq
+    SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER}
+    SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    SPRING_DATA_REDIS_HOST: valkey
+    MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces   # Boot 4 property name
+    MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT: http://otel-collector:4318/v1/logs
+    MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED: "${TRACING_EXPORT:-false}"
+    MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: "false"   # metrics are scraped by Prometheus
+    MANAGEMENT_TRACING_EXPORT_ENABLED: "${TRACING_EXPORT:-false}"   # TRACING_EXPORT=true with --profile full
+  depends_on: &java-deps
+    postgres: { condition: service_healthy }
+    rabbitmq: { condition: service_healthy }
+    keycloak: { condition: service_healthy }
+  mem_limit: 384m
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: ["no-new-privileges:true"]
+  healthcheck: &java-health
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health/readiness | grep -q UP"]
+    interval: 10s
+    timeout: 3s
+    retries: 30
+    start_period: 40s
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD}
+    command: ["postgres", "-c", "max_connections=200", "-c", "shared_buffers=128MB"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/init.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
+    ports: ["127.0.0.1:15432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres && psql -U postgres -lqt | grep -q notifications"]
+      interval: 5s
+      retries: 30
+    mem_limit: 512m
+
+  rabbitmq:
+    image: rabbitmq:4.2-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitdata:/var/lib/rabbitmq
+      - ./infrastructure/docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/conf.d/20-streamsphere.conf:ro
+    ports: ["127.0.0.1:5672:5672", "127.0.0.1:15672:15672"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 10s
+      retries: 30
+    mem_limit: 384m
+
+  valkey:
+    image: valkey/valkey:9.0-alpine
+    command: ["valkey-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    ports: ["127.0.0.1:16379:6379"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+    mem_limit: 96m
+
+  minio:
+    # Archived upstream (ADR-0007): digest-pinned cached image, localhost only.
+    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      # "*" is required: playback 302s gateway→storage, and browsers send "Origin: null" after a
+      # cross-origin redirect (Fetch spec tainted origin). Access control = presigned signature + 60 s TTL (ADR-0008).
+      MINIO_API_CORS_ALLOW_ORIGIN: "*"
+    volumes: [miniodata:/data]
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      retries: 30
+    mem_limit: 384m
+
+  minio-init:
+    image: minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    depends_on: { minio: { condition: service_healthy } }
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb -p local/streamsphere-uploads local/streamsphere-media
+        mc anonymous set none local/streamsphere-uploads
+        mc anonymous set none local/streamsphere-media
+        # abandoned multipart uploads / raw sources are cleaned by the upload service reconciler
+        echo "buckets ready (private)"
+    restart: "no"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.1@sha256:be6a86215213145bfb4fb3e2b3ab982a806d00262655abdcf3ffa6a38d241c7c
+    command: ["start-dev", "--import-realm", "--health-enabled=true"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak_svc
+      KC_DB_PASSWORD: keycloak_local_pw
+      KC_HOSTNAME: http://localhost:8180
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HTTP_ENABLED: "true"
+      JAVA_OPTS_KC_HEAP: "-XX:MaxRAMPercentage=65"
+    volumes:
+      - ./infrastructure/docker/keycloak/streamsphere-realm.json:/opt/keycloak/data/import/streamsphere-realm.json:ro
+    ports: ["127.0.0.1:8180:8080"]
+    depends_on: { postgres: { condition: service_healthy } }
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 10s
+      retries: 40
+      start_period: 30s
+    mem_limit: 768m
+
+  gateway:
+    <<: *java
+    image: ${IMAGE_PREFIX:-streamsphere}/${IMAGE_NAME_PREFIX:-}gateway:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: infrastructure/docker/java-service.Dockerfile
+      target: ${JAVA_IMAGE_TARGET:-runtime-prebuilt}
+      args: { MODULE: services/gateway }
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8080"
+      CATALOG_URL: http://catalog:8080
+      CREATOR_URL: http://creator:8080
+      PROFILE_URL: http://profile:8080
+      UPLOAD_URL: http://upload:8080
+      MEDIA_URL: http://media:8080
+      PLAYBACK_URL: http://playback:8080
+      HISTORY_URL: http://history:8080
+      SEARCH_URL: http://search:8080
+      RECOMMENDATIONS_URL: http://recommendations:8080
+      MODERATION_URL: http://moderation:8080
+      ANALYTICS_URL: http://analytics:8080
+      NOTIFICATIONS_URL: http://notifications:8080
+      CORS_ORIGINS: http://localhost:4200,http://127.0.0.1:4200
+    ports: ["127.0.0.1:8080:8080"]
+    mem_limit: 320m
+    depends_on:
+      keycloak: { condition: service_healthy }
+
+  profile:
+    <<: *java
+    image: ${IMAGE_PREFIX:-streamsphere}/${IMAGE_NAME_PREFIX:-}profile:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: infrastructure/docker/java-service.Dockerfile
+      target: ${JAVA_IMAGE_TARGET:-runtime-prebuilt}
+      args: { MODULE: services/profile }
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8080"
+      CATALOG_URL: http://catalog:8080
+      CREATOR_URL: http://creator:8080
+      PROFILE_URL: http://profile:8080
+      UPLOAD_URL: http://upload:8080
+      MEDIA_URL: http://media:8080
+      PLAYBACK_URL: http://playback:8080
+      HISTORY_URL: http://history:8080
+      SEARCH_URL: http://search:8080
+      RECOMMENDATIONS_URL: http://recommendations:8080
+      MODERATION_URL: http://moderation:8080
+      ANALYTICS_URL: http://analytics:8080
+      NOTIFICATIONS_URL: http://notifications:8080
+
+  catalog:
+    <<: *java
+    image: ${IMAGE_PREFIX:-streamsphere}/${IMAGE_NAME_PREFIX:-}catalog:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: infrastructure/docker/java-service.Dockerfile
+      target: ${JAVA_IMAGE_TARGET:-runtime-prebuilt}
+      args: { MODULE: services/catalog }
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8080"
+      CATALOG_URL: http://catalog:8080
+      CREATOR_URL: http://creator:8080
+      PROFILE_URL: http://profile:8080
+      UPLOAD_URL: http://upload:8080
+      MEDIA_URL: http://media:8080
+      PLAYBACK_URL: http://playback:8080
+      HISTORY_URL: http://history:8080
+      SEARCH_URL: http://search:8080
+      RECOMMENDATIONS_URL: http://recommendations:8080
+      MODERATION_URL: http://moderation:8080
+      ANALYTICS_URL: http://analytics:8080
+      NOTIFICATIONS_URL: http://notifications:8080
+
+  creator:
+    <<: *java
+    image: ${IMAGE_PREFIX:-streamsphere}/${IMAGE_NAME_PREFIX:-}creator:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: infrastructure/docker/java-service.Dockerfile
+      target: ${JAVA_IMAGE_TARGET:-runtime-prebuilt}
+      args: { MODULE: services/creator }
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8080"
+      CATALOG_URL: http://catalog:8080
+      CREATOR_URL: http://creator:8080
+      PROFILE_URL: http://profile:8080
+      UPLOAD_URL: http://upload:8080
+      MEDIA_URL: http://media:8080
+      PLAYBACK_URL: http://playback:8080
+      HISTORY_URL: http://history:8080
+      SEARCH_URL: http://search:8080
+      RECOMMENDATIONS_URL: http://recommendations:8080
+      MODERATION_URL: http://moderation:8080
+      ANALYTICS_URL: http://analytics:8080
+      NOTIFICATIONS_URL: http://notifications:8080
+
+  history:
+    <<: *java
+    image: ${IMAGE_PREFIX:-streamsphere}/${IMAGE_NAME_PREFIX:-}history:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: infrastructure/docker/java-service.Dockerfile
+      target: ${JAVA_IMAGE_TARGET:-runtime-prebuilt}
+      args: { MODULE: services/history }
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8080"
+      CATALOG_URL: http://catalog:8080
+      CREATOR_URL: http://creator:8080
+      PROFILE_URL: http://profile:8080
+      UPLOAD_URL: http://upload:8080
+      MEDIA_URL: http://media:8080
+      PLAYBACK_URL: http://playback:8080
+      HISTORY_URL: http://history:8080
+      SEARCH_URL: http://search:8080
+      RECOMMENDATIONS_URL: http://recommendations:8080
+      MODERATION_URL: http://moderation:8080
+      ANALYTICS_URL: http://analytics:8080
+      NOTIFICATIONS_URL: http://notifications:8080
+
+  moderation:
+    <<: *java
+    image: ${IMAGE_PREFIX:-streamsphere}/${IMAGE_NAME_PREFIX:-}moderation:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: infrastructure/docker/java-service.Dockerfile
+      target: ${JAVA_IMAGE_TARGET:-runtime-prebuilt}
+      args: { MODULE: services/moderation }
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8080"
+      CATALOG_URL: http://catalog:8080
+      CREATOR_URL: http://creator:8080
+      PROFILE_URL: http://profile:8080
+      UPLOAD_URL: http://upload:8080
+      MEDIA_URL: http://media:8080
+      PLAYBACK_URL: http://playback:8080
+      HISTORY_URL: http://history:8080
+      SEARCH_URL: http://search:8080
+      RECOMMENDATIONS_URL: http://recommendations:8080
+      MODERATION_URL: http://moderation:8080
+      ANALYTICS_URL: http://analytics:8080
+      NOTIFICATIONS_URL: http://notifications:8080
+
+  analytics:
+    <<: *java
+    image: ${IMAGE_PREFIX:-streamsphere}/${IMAGE_NAME_PREFIX:-}analytics:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: infrastructure/docker/java-service.Dockerfile
+      target: ${JAVA_IMAGE_TARGET:-runtime-prebuilt}
+      args: { MODULE: services/analytics }
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8080"
+      CATALOG_URL: http://catalog:8080
+      CREATOR_URL: http://creator:8080
+      PROFILE_URL: http://profile:8080
+      UPLOAD_URL: http://upload:8080
+      MEDIA_URL: http://media:8080
+      PLAYBACK_URL: http://playback:8080
+      HISTORY_URL: http://history:8080
+      SEARCH_URL: http://search:8080
+      RECOMMENDATIONS_URL: http://recommendations:8080
+      MODERATION_URL: http://moderation:8080
+      ANALYTICS_URL: http://analytics:8080
+      NOTIFICATIONS_URL: http://notifications:8080
+      ANALYTICS_USER_HASH_SALT: ${ANALYTICS_USER_HASH_SALT:-local-dev-salt-change-me}
+      ANALYTICS_KAFKA_ENABLED: ${ANALYTICS_KAFKA_ENABLED:-false}   # true with --profile full
+      KAFKA_BOOTSTRAP: kafka:9092
+
+  notifications:
+    <<: *java
+    image: ${IMAGE_PREFIX:-streamsphere}/${IMAGE_NAME_PREFIX:-}notifications:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: infrastructure/docker/java-service.Dockerfile
+      target: ${JAVA_IMAGE_TARGET:-runtime-prebuilt}
+      args: { MODULE: services/notifications }
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8080"
+      CATALOG_URL: http://catalog:8080
+      CREATOR_URL: http://creator:8080
+      PROFILE_URL: http://profile:8080
+      UPLOAD_URL: http://upload:8080
+      MEDIA_URL: http://media:8080
+      PLAYBACK_URL: http://playback:8080
+      HISTORY_URL: http://history:8080
+      SEARCH_URL: http://search:8080
+      RECOMMENDATIONS_URL: http://recommendations:8080
+      MODERATION_URL: http://moderation:8080
+      ANALYTICS_URL: http://analytics:8080
+      NOTIFICATIONS_URL: http://notifications:8080
+
+  search:
+    <<: *java
+    image: ${IMAGE_PREFIX:-streamsphere}/${IMAGE_NAME_PREFIX:-}search:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: infrastructure/docker/java-service.Dockerfile
+      target: ${JAVA_IMAGE_TARGET:-runtime-prebuilt}
+      args: { MODULE: services/search }
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8080"
+      CATALOG_URL: http://catalog:8080
+      CREATOR_URL: http://creator:8080
+      PROFILE_URL: http://profile:8080
+      UPLOAD_URL: http://upload:8080
+      MEDIA_URL: http://media:8080
+      PLAYBACK_URL: http://playback:8080
+      HISTORY_URL: http://history:8080
+      SEARCH_URL: http://search:8080
+      RECOMMENDATIONS_URL: http://recommendations:8080
+      MODERATION_URL: http://moderation:8080
+      ANALYTICS_URL: http://analytics:8080
+      NOTIFICATIONS_URL: http://notifications:8080
+
+  upload:
+    <<: *java
+    image: ${IMAGE_PREFIX:-streamsphere}/${IMAGE_NAME_PREFIX:-}upload:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: infrastructure/docker/java-service.Dockerfile
+      target: ${JAVA_IMAGE_TARGET:-runtime-prebuilt}
+      args: { MODULE: services/upload }
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8080"
+      CATALOG_URL: http://catalog:8080
+      CREATOR_URL: http://creator:8080
+      PROFILE_URL: http://profile:8080
+      UPLOAD_URL: http://upload:8080
+      MEDIA_URL: http://media:8080
+      PLAYBACK_URL: http://playback:8080
+      HISTORY_URL: http://history:8080
+      SEARCH_URL: http://search:8080
+      RECOMMENDATIONS_URL: http://recommendations:8080
+      MODERATION_URL: http://moderation:8080
+      ANALYTICS_URL: http://analytics:8080
+      NOTIFICATIONS_URL: http://notifications:8080
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_PUBLIC_ENDPOINT: http://localhost:9000
+      STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER}
+      STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      STORAGE_QUOTA_BYTES: ${STORAGE_QUOTA_BYTES}
+      COST_GUARD_STOP_RATIO: ${COST_GUARD_STOP_RATIO}
+      TUS_HOOK_SECRET: ${TUS_HOOK_SECRET}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES}
+
+  media:
+    <<: *java
+    image: ${IMAGE_PREFIX:-streamsphere}/${IMAGE_NAME_PREFIX:-}media:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: infrastructure/docker/java-service.Dockerfile
+      target: ${JAVA_IMAGE_TARGET:-runtime-prebuilt}
+      args: { MODULE: services/media }
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8080"
+      CATALOG_URL: http://catalog:8080
+      CREATOR_URL: http://creator:8080
+      PROFILE_URL: http://profile:8080
+      UPLOAD_URL: http://upload:8080
+      MEDIA_URL: http://media:8080
+      PLAYBACK_URL: http://playback:8080
+      HISTORY_URL: http://history:8080
+      SEARCH_URL: http://search:8080
+      RECOMMENDATIONS_URL: http://recommendations:8080
+      MODERATION_URL: http://moderation:8080
+      ANALYTICS_URL: http://analytics:8080
+      NOTIFICATIONS_URL: http://notifications:8080
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_PUBLIC_ENDPOINT: http://localhost:9000
+      STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER}
+      STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      TRANSCODE_LAUNCHER: queue
+
+  playback:
+    <<: *java
+    image: ${IMAGE_PREFIX:-streamsphere}/${IMAGE_NAME_PREFIX:-}playback:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: infrastructure/docker/java-service.Dockerfile
+      target: ${JAVA_IMAGE_TARGET:-runtime-prebuilt}
+      args: { MODULE: services/playback }
+    environment:
+      <<: *java-env
+      SERVER_PORT: "8080"
+      CATALOG_URL: http://catalog:8080
+      CREATOR_URL: http://creator:8080
+      PROFILE_URL: http://profile:8080
+      UPLOAD_URL: http://upload:8080
+      MEDIA_URL: http://media:8080
+      PLAYBACK_URL: http://playback:8080
+      HISTORY_URL: http://history:8080
+      SEARCH_URL: http://search:8080
+      RECOMMENDATIONS_URL: http://recommendations:8080
+      MODERATION_URL: http://moderation:8080
+      ANALYTICS_URL: http://analytics:8080
+      NOTIFICATIONS_URL: http://notifications:8080
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_PUBLIC_ENDPOINT: http://localhost:9000
+      STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER}
+      STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      PLAYBACK_TOKEN_SECRET: ${PLAYBACK_TOKEN_SECRET}
+
+  recommendations:
+    image: ${IMAGE_PREFIX:-streamsphere}/${IMAGE_NAME_PREFIX:-}recommendations:${IMAGE_TAG:-local}
+    build: { context: services/recommendations }
+    environment:
+      DB_DSN: postgresql://recommendations_svc:recommendations_local_pw@postgres:5432/recommendations
+      RABBIT_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      JWT_ISSUER: http://localhost:8180/realms/streamsphere
+      JWKS_URI: http://keycloak:8080/realms/streamsphere/protocol/openid-connect/certs
+      USER_HASH_SALT: ${ANALYTICS_USER_HASH_SALT:-local-dev-salt-change-me}
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      keycloak: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/actuator/health/readiness')"]
+      interval: 10s
+      retries: 30
+      start_period: 20s
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    restart: unless-stopped
+
+  web:
+    image: ${IMAGE_PREFIX:-streamsphere}/${IMAGE_NAME_PREFIX:-}web:${IMAGE_TAG:-local}
+    build: { context: apps/web-angular }
+    environment:
+      API_BASE: ${PUBLIC_API_BASE:-http://localhost:8080}
+      OIDC_AUTHORITY: ${PUBLIC_OIDC_AUTHORITY:-http://localhost:8180/realms/streamsphere}
+    ports: ["127.0.0.1:4200:8080"]
+    read_only: true
+    tmpfs: ["/tmp", "/var/cache/nginx"]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/config.js"]
+      interval: 10s
+    mem_limit: 64m
+    restart: unless-stopped
+
+  ffmpeg-worker:
+    image: ${IMAGE_PREFIX:-streamsphere}/${IMAGE_NAME_PREFIX:-}ffmpeg-worker:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: infrastructure/docker/ffmpeg-worker.Dockerfile
+      target: ${JAVA_IMAGE_TARGET:-runtime-prebuilt}
+    command: ["--mode=consumer"]
+    environment:
+      SPRING_RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER}
+      STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      FAULT_INJECTION: ${FFMPEG_FAULT_INJECTION:-}
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    read_only: true
+    tmpfs: ["/tmp", "/work:size=4g,uid=10001,gid=10001"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    cpus: 2.0
+    mem_limit: 1536m
+    restart: unless-stopped
+
+  tusd:
+    # tus resumable-upload protocol server (UploadProvider "tus"). Stores straight into the private uploads
+    # bucket; admission + verification happen in the upload service via HTTP hooks.
+    profiles: [full]
+    image: tusproject/tusd:v2.10.1
+    command: ["-s3-bucket=streamsphere-uploads", "-s3-endpoint=http://minio:9000", "-s3-object-prefix=tus/",
+              "-base-path=/files/", "-behind-proxy",
+              "-hooks-http=http://upload:8080/api/v1/internal/tus/hooks?secret=${TUS_HOOK_SECRET}",
+              "-hooks-enabled-events=pre-create,post-finish", "-hooks-http-forward-headers=Authorization",
+              "-cors-allow-origin=^http://(localhost|127\\.0\\.0\\.1):4200$"]
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_REGION: us-east-1
+    ports: ["127.0.0.1:1080:8080"]
+    depends_on: { minio: { condition: service_healthy } }
+    read_only: true
+    tmpfs: ["/tmp:size=256m"]   # tusd buffers S3 parts here
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+
+  # ---------------------------------------------------------------- local-full profile
+  otel-collector:
+    profiles: [full]
+    image: otel/opentelemetry-collector-contrib:0.138.0
+    command: ["--config=/etc/otel/collector.yaml"]
+    volumes: [./observability/otel/collector.yaml:/etc/otel/collector.yaml:ro]
+    mem_limit: 256m
+  tempo:
+    profiles: [full]
+    image: grafana/tempo:2.6.1@sha256:ef4384fce6e8ad22b95b243d8fc165628cda655376fd50e7850536ad89d71d50
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes: [./observability/otel/tempo.yaml:/etc/tempo.yaml:ro]
+    mem_limit: 384m
+  loki:
+    profiles: [full]
+    image: grafana/loki:3.5.7
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    mem_limit: 384m
+  prometheus:
+    profiles: [full]
+    image: prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=3d"]
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/alerts:/etc/prometheus/alerts:ro
+    ports: ["127.0.0.1:9090:9090"]
+    mem_limit: 384m
+  grafana:
+    profiles: [full]
+    image: grafana/grafana:11.3.1@sha256:fa801ab6e1ae035135309580891e09f7eb94d1abdbd2106bdc288030b028158c
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-local-grafana-pw}
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["127.0.0.1:3000:3000"]
+    mem_limit: 256m
+  kafka:
+    profiles: [full]
+    image: apache/kafka:4.1.2@sha256:5cc2a2fd93fa2687b44015eee04fb2c3edd9e526bd64bf8bec5ff1e268772e0e
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:19092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_HEAP_OPTS: "-Xmx384m -Xms128m"
+    ports: ["127.0.0.1:19092:19092"]
+    mem_limit: 768m
+  mailpit:
+    profiles: [full]
+    image: axllent/mailpit:v1.27
+    ports: ["127.0.0.1:8025:8025"]
+    mem_limit: 64m
+
+volumes:
+  pgdata:
+  rabbitdata:
+  miniodata:

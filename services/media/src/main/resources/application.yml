@@ -1,0 +1,55 @@
+spring:
+  application.name: media
+  threads.virtual.enabled: true
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:15432}/media
+    username: media_svc
+    password: ${DB_PASSWORD:media_local_pw}
+    hikari.maximum-pool-size: 6
+  flyway.locations: classpath:db/migration,classpath:db/common
+  rabbitmq:
+    publisher-confirm-type: simple
+    username: ${RABBITMQ_USER:streamsphere}
+    password: ${RABBITMQ_PASSWORD:local-rabbit-pw}
+  data.redis:
+    port: ${REDIS_PORT:16379}
+    timeout: 300ms
+server:
+  port: ${SERVER_PORT:8085}
+  shutdown: graceful
+management:
+  endpoints.web.exposure.include: health,info,prometheus
+  endpoint.health.probes.enabled: true
+  tracing.sampling.probability: 1.0
+  metrics.tags.service: ${spring.application.name}
+streamsphere:
+  service-name: media
+  security:
+    issuer: ${STREAMSPHERE_SECURITY_ISSUER:http://localhost:8180/realms/streamsphere}
+    jwk-set-uri: ${STREAMSPHERE_SECURITY_JWK_SET_URI:http://localhost:8180/realms/streamsphere/protocol/openid-connect/certs}
+    public-paths: [/api/v1/media/assets/*/poster]
+  service-auth:
+    token-uri: ${STREAMSPHERE_SERVICE_AUTH_TOKEN_URI:http://localhost:8180/realms/streamsphere/protocol/openid-connect/token}
+    client-id: svc-media
+    client-secret: ${SERVICE_CLIENT_SECRET:media-local-secret}
+  storage:
+    provider: ${STORAGE_PROVIDER:minio}
+    endpoint: ${STORAGE_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${STORAGE_PUBLIC_ENDPOINT:http://localhost:9000}
+    region: ${STORAGE_REGION:us-east-1}
+    access-key: ${STORAGE_ACCESS_KEY:streamsphere}
+    secret-key: ${STORAGE_SECRET_KEY:local-minio-pw-123}
+  paid-providers:
+    enabled: ${PAID_PROVIDERS_ENABLED:false}
+  media:
+    output-bucket: ${MEDIA_BUCKET:streamsphere-media}
+    launcher: ${TRANSCODE_LAUNCHER:queue}
+    max-height: ${TRANSCODE_MAX_HEIGHT:720}
+    max-attempts: 3
+    k8s:
+      image: ${FFMPEG_WORKER_IMAGE:streamsphere/ffmpeg-worker:local}
+---
+spring.config.activate.on-profile: docker
+spring.datasource.url: jdbc:postgresql://postgres:5432/media
+spring.data.redis.port: 6379
+logging.structured.format.console: ecs

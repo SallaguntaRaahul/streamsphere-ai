@@ -1,0 +1,46 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "MediaReady.v1.schema.json",
+ "title": "MediaReady.v1 payload",
+ "description": "Routing key MediaReady.v1 on exchange streamsphere.events. Producer: media. Consumers: catalog, upload, notifications",
+ "type": "object",
+ "required": [
+  "assetId",
+  "titleId"
+ ],
+ "properties": {
+  "assetId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "titleId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "uploadId": {
+   "type": "string",
+   "format": "uuid"
+  },
+  "creatorId": {
+   "type": "string"
+  },
+  "version": {
+   "type": "integer"
+  },
+  "durationSeconds": {
+   "type": "integer"
+  },
+  "hasPoster": {
+   "type": "boolean"
+  },
+  "totalBytes": {
+   "type": "integer"
+  },
+  "renditions": {
+   "type": "array",
+   "items": {
+    "type": "string"
+   }
+  }
+ }
+}
